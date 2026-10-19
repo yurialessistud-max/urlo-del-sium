@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulatore di Battaglie Epiche - Nuclear Launchpad Edition</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=MedievalSharp&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cinzel: ['Cinzel', 'serif'],
+                        medieval: ['MedievalSharp', 'cursive'],
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        gold: {
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+        }
+        .wood-panel {
+            background: linear-gradient(135deg, #2d1b0e 0%, #1a0f08 100%);
+            border: 2px solid #854d0e;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .gold-border {
+            border: 2px solid #eab308;
+            box-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
+        }
+        .unit-card {
+            transition: all 0.2s ease;
+        }
+        .unit-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3);
+        }
+        .unit-card.selected {
+            border-color: #facc15 !important;
+            background-color: rgba(234, 179, 8, 0.15) !important;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        canvas {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans overflow-x-hidden">
+
+    <!-- Header / Navbar -->
+    <header class="wood-panel border-b border-amber-800/50 py-3 px-6 flex flex-wrap justify-between items-center z-10">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-radiation text-amber-500 text-3xl animate-pulse"></i>
+            <div>
+                <h1 class="font-cinzel font-bold text-2xl text-amber-400 tracking-wider">WARLORDS OF GLORY</h1>
+                <p class="text-xs text-amber-200/70 font-medieval">Simulatore Strategico Tattico con Silo Nucleare & NavMesh Fluidissima</p>
+            </div>
+        </div>
+
+        <!-- Audio controls & General actions -->
+        <div class="flex items-center gap-4">
+            <button id="audioToggleBtn" class="bg-slate-800 hover:bg-slate-700 text-amber-400 p-2.5 rounded-lg border border-amber-600/40 transition flex items-center gap-2 text-sm font-semibold">
+                <i class="fa-solid fa-volume-high" id="audioIcon"></i>
+                <span id="audioStatus" class="hidden sm:inline">Audio On</span>
+            </button>
+            <button id="resetAllBtn" class="bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-700/50 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                <i class="fa-solid fa-rotate-right mr-1"></i> Nuovo Scontro
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="flex-1 flex flex-col lg:flex-row p-4 gap-4 max-w-[1800px] w-full mx-auto">
+
+        <!-- Left Panel: Army Setup & Selection -->
+        <aside class="lg:w-80 flex flex-col gap-4 shrink-0">
+            <!-- Team Switcher / Controls -->
+            <div class="wood-panel p-4 rounded-xl">
+                <h2 class="font-cinzel text-amber-400 text-lg font-bold mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-flag mr-2"></i>Fazione Attiva</span>
+                    <span id="activeTeamIndicator" class="text-xs px-2 py-1 rounded bg-red-950 text-red-400 border border-red-700 font-sans font-bold">ROSSO</span>
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button id="selectRedBtn" class="py-2.5 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition border-red-500 bg-red-950/60 text-red-300">
+                        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> Rosso (Esercito 1)
+                    </button>
+                    <button id="selectBlueBtn" class="py-2.5 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 border-transparent bg-slate-800/80 text-slate-400 hover:text-blue-300 transition">
+                        <span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Blu (Esercito 2)
+                    </button>
+                </div>
+
+                <!-- Budget Indicators -->
+                <div class="space-y-2 text-sm bg-slate-900/80 p-3 rounded-lg border border-amber-900/40">
+                    <div class="flex justify-between items-center">
+                        <span class="text-red-400 font-semibold flex items-center gap-1"><i class="fa-solid fa-coins text-amber-400"></i> Oro Rosso:</span>
+                        <span id="redGoldDisplay" class="font-bold text-amber-400 text-base">1500 / 1500</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div id="redGoldBar" class="bg-red-500 h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+                        <span class="text-blue-400 font-semibold flex items-center gap-1"><i class="fa-solid fa-coins text-amber-400"></i> Oro Blu:</span>
+                        <span id="blueGoldDisplay" class="font-bold text-amber-400 text-base">1500 / 1500</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div id="blueGoldBar" class="bg-blue-500 h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- AI Generation Options -->
+                <div class="mt-4 pt-3 border-t border-amber-900/40 flex gap-2">
+                    <button id="aiFillBlueBtn" class="flex-1 bg-blue-900/50 hover:bg-blue-800/60 text-blue-200 border border-blue-700/50 text-xs py-2 px-2 rounded-lg transition font-semibold flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-robot"></i> Genera AI Blu
+                    </button>
+                    <button id="aiFillRedBtn" class="flex-1 bg-red-900/50 hover:bg-red-800/60 text-red-200 border border-red-700/50 text-xs py-2 px-2 rounded-lg transition font-semibold flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-robot"></i> Genera AI Rosso
+                    </button>
+                </div>
+            </div>
+
+            <!-- Unit Types List -->
+            <div class="wood-panel p-4 rounded-xl flex-1 flex flex-col min-h-[380px]">
+                <h2 class="font-cinzel text-amber-400 text-base font-bold mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-chess-knight mr-2"></i>Recluta Unità</span>
+                    <span class="text-xs text-amber-200/60 font-sans">Seleziona e clicca sulla mappa</span>
+                </h2>
+
+                <div id="unitSelectionContainer" class="space-y-2 overflow-y-auto pr-1 flex-1 max-h-[440px]">
+                    <!-- Unit Cards via JS -->
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-amber-900/40 text-xs text-amber-200/60 text-center">
+                    <i class="fa-solid fa-biohazard text-amber-400 mr-1"></i> Il Sito Nucleare scatena un fungo atomico devastante ad area!
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: Battle Arena Canvas -->
+        <section class="flex-1 flex flex-col gap-3">
+            <!-- Canvas Container -->
+            <div class="relative flex-1 bg-slate-900 rounded-xl overflow-hidden wood-panel p-2 min-h-[500px] flex flex-col justify-center items-center">
+                <canvas id="battleCanvas" class="w-full h-full rounded-lg cursor-crosshair bg-emerald-950 border border-amber-900/50 shadow-2xl block"></canvas>
+
+                <!-- Placement Zone Overlays / Banner Warnings -->
+                <div id="phaseBadge" class="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-950/90 text-amber-400 font-cinzel font-bold px-4 py-1.5 rounded-full border border-amber-500 shadow-lg text-sm tracking-wide pointer-events-none flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot"></i> FASE DI SCHIERAMENTO
+                </div>
+
+                <!-- Canvas Control Bar Hovering Overlay -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-950/85 backdrop-blur border border-amber-600/50 rounded-2xl px-6 py-3 flex items-center gap-4 shadow-2xl z-20">
+                    <button id="startBattleBtn" class="bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-white font-cinzel font-black text-lg px-8 py-2.5 rounded-xl shadow-lg hover:shadow-emerald-500/20 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
+                        <i class="fa-solid fa-play text-xl"></i> PARTI!
+                    </button>
+
+                    <button id="pauseBattleBtn" class="hidden bg-amber-600 hover:bg-amber-500 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-pause"></i> Pausa
+                    </button>
+
+                    <div class="h-6 w-px bg-slate-700 mx-1"></div>
+
+                    <!-- Speed Controls -->
+                    <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700">
+                        <button id="speed1x" class="px-2.5 py-1 text-xs font-bold rounded bg-amber-500 text-slate-950">1x</button>
+                        <button id="speed2x" class="px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white">2x</button>
+                        <button id="speed4x" class="px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white">4x</button>
+                    </div>
+
+                    <div class="h-6 w-px bg-slate-700 mx-1"></div>
+
+                    <button id="clearBoardBtn" class="text-slate-400 hover:text-rose-400 text-sm font-semibold transition px-2 py-1" title="Svuota Campo">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Svuota
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Selected Unit Details & Battle Live Feed -->
+        <aside class="lg:w-80 flex flex-col gap-4 shrink-0">
+            <!-- Selected Unit Card Inspector -->
+            <div class="wood-panel p-4 rounded-xl">
+                <h2 class="font-cinzel text-amber-400 text-base font-bold mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> Ispezione Unità
+                </h2>
+                <div id="inspectorContent" class="bg-slate-950/60 p-3 rounded-lg border border-amber-900/30 min-h-[160px] flex flex-col justify-center">
+                    <p class="text-xs text-amber-200/50 text-center italic">Clicca su un'unità sul terreno o nel menù per visualizzare le sue caratteristiche dettagliate.</p>
+                </div>
+            </div>
+
+            <!-- Live Battle Log & Statistics -->
+            <div class="wood-panel p-4 rounded-xl flex-1 flex flex-col min-h-[250px]">
+                <h2 class="font-cinzel text-amber-400 text-base font-bold mb-2 flex items-center justify-between">
+                    <span><i class="fa-solid fa-scroll mr-2"></i>Diario di Guerra</span>
+                    <span id="unitCounterBadge" class="text-xs font-sans text-amber-200/60">0 Unità Presenti</span>
+                </h2>
+
+                <div id="battleLog" class="flex-1 bg-slate-950/80 p-3 rounded-lg font-mono text-xs text-slate-300 overflow-y-auto space-y-1.5 border border-amber-900/30 max-h-[300px]">
+                    <div class="text-amber-500/80 italic">-- Schiera le truppe e premi 'PARTI!' per iniziare il combattimento --</div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Modal Risultati Finale -->
+    <div id="victoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="wood-panel gold-border max-w-lg w-full p-6 rounded-2xl shadow-2xl relative text-center animate-bounce-in">
+            <div id="winnerBanner" class="py-3 px-6 rounded-xl font-cinzel font-black text-2xl mb-4 text-white uppercase tracking-widest shadow-inner">
+                VITTORIA!
+            </div>
+
+            <h3 class="font-cinzel text-amber-400 text-xl font-bold mb-4">Report Finale dello Scontro</h3>
+
+            <div class="grid grid-cols-2 gap-3 mb-6 text-left">
+                <div class="bg-slate-900/90 p-3 rounded-lg border border-amber-900/40">
+                    <div class="text-xs text-red-400 font-bold mb-1"><i class="fa-solid fa-skull"></i> PERDITE ROSSO</div>
+                    <div id="statRedKills" class="text-lg font-bold text-slate-200">0 / 0 caduti</div>
+                </div>
+                <div class="bg-slate-900/90 p-3 rounded-lg border border-amber-900/40">
+                    <div class="text-xs text-blue-400 font-bold mb-1"><i class="fa-solid fa-skull"></i> PERDITE BLU</div>
+                    <div id="statBlueKills" class="text-lg font-bold text-slate-200">0 / 0 caduti</div>
+                </div>
+                <div class="col-span-2 bg-slate-900/90 p-3 rounded-lg border border-amber-900/40 flex items-center gap-3">
+                    <div class="text-amber-400 text-2xl"><i class="fa-solid fa-trophy"></i></div>
+                    <div>
+                        <div class="text-xs text-amber-200/70 font-semibold">CAMPIONE / MVP DELLA BATTAGLIA</div>
+                        <div id="statMVP" class="font-bold text-amber-400 text-sm">Nessuno</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="closeModalBtn" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 px-4 rounded-xl transition font-cinzel">
+                    Torna al Campo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        /* --- COSTANTI E CONFIGURAZIONE UNITA --- */
+        const UNIT_TYPES = {
+            infantry: {
+                id: 'infantry',
+                name: 'Fanteria Leggera',
+                icon: 'fa-user-shield',
+                cost: 50,
+                hp: 120,
+                maxHp: 120,
+                damage: 18,
+                range: 22,
+                speed: 1.6,
+                attackSpeed: 1000,
+                size: 11,
+                color: '#ef4444',
+                description: 'Soldati di linea rapidi ed economici.'
+            },
+            knight: {
+                id: 'knight',
+                name: 'Cavaliere',
+                icon: 'fa-horse-head',
+                cost: 120,
+                hp: 260,
+                maxHp: 260,
+                damage: 35,
+                range: 25,
+                speed: 2.5,
+                attackSpeed: 900,
+                size: 14,
+                color: '#ef4444',
+                description: 'Carica rapida con alto danno e corazza pesante.'
+            },
+            archer: {
+                id: 'archer',
+                name: 'Arciere',
+                icon: 'fa-bow-arrow',
+                cost: 80,
+                hp: 75,
+                maxHp: 75,
+                damage: 22,
+                range: 170,
+                speed: 1.3,
+                attackSpeed: 1400,
+                size: 10,
+                color: '#ef4444',
+                description: 'Attacco a distanza. Spara oltre il fiume.'
+            },
+            sniper: {
+                id: 'sniper',
+                name: 'Cecchino',
+                icon: 'fa-crosshairs',
+                cost: 140,
+                hp: 60,
+                maxHp: 60,
+                damage: 90,
+                range: 320,
+                speed: 1.0,
+                attackSpeed: 2800,
+                size: 9,
+                color: '#ef4444',
+                description: 'Portata lunghissima e danno singolo elevatissimo.'
+            },
+            mage: {
+                id: 'mage',
+                name: 'Mago',
+                icon: 'fa-wand-magic-sparkles',
+                cost: 160,
+                hp: 110,
+                maxHp: 110,
+                damage: 45,
+                range: 140,
+                speed: 1.1,
+                attackSpeed: 2000,
+                size: 12,
+                areaDamage: true,
+                areaRadius: 45,
+                color: '#ef4444',
+                description: 'Incantesimi ad area. Colpisce truppe raggruppate sui ponti.'
+            },
+            catapult: {
+                id: 'catapult',
+                name: 'Catapulta',
+                icon: 'fa-shield-catapult',
+                cost: 220,
+                hp: 180,
+                maxHp: 180,
+                damage: 85,
+                range: 280,
+                speed: 0.6,
+                attackSpeed: 3200,
+                size: 16,
+                areaDamage: true,
+                areaRadius: 60,
+                color: '#ef4444',
+                description: 'Devastante artiglieria a lunghissimo raggio.'
+            },
+            tank: {
+                id: 'tank',
+                name: 'Carro Armato',
+                icon: 'fa-shield-halved',
+                cost: 350,
+                hp: 750,
+                maxHp: 750,
+                damage: 120,
+                range: 220,
+                speed: 0.8,
+                attackSpeed: 2500,
+                size: 20,
+                areaDamage: true,
+                areaRadius: 50,
+                color: '#ef4444',
+                description: 'Super corazzato, colpi di cannone esplosivi ad area. Deve usare i ponti!'
+            },
+            turret: {
+                id: 'turret',
+                name: 'Torretta Difensiva',
+                icon: 'fa-tower-observation',
+                cost: 200,
+                hp: 500,
+                maxHp: 500,
+                damage: 30,
+                range: 230,
+                speed: 0,
+                static: true,
+                attackSpeed: 600,
+                size: 18,
+                color: '#ef4444',
+                description: 'Fortificazione statica con mitragliatrice ad alta cadenza per difendere i ponti.'
+            },
+            nukeSilo: {
+                id: 'nukeSilo',
+                name: 'Sito Nucleare',
+                icon: 'fa-radiation',
+                cost: 350,
+                hp: 650,
+                maxHp: 650,
+                damage: 400,
+                range: 2000,
+                speed: 0,
+                static: true,
+                attackSpeed: 14000, // 14 secondi di countdown
+                size: 22,
+                areaDamage: true,
+                areaRadius: 160,
+                color: '#f59e0b',
+                description: 'Lancia un missile atomico con fungo e onda d\'urto devastante ad area dopo un conto alla rovescia.'
+            }
+        };
+
+        const INITIAL_GOLD = 1500;
+
+        /* --- SINTESI AUDIO (Web Audio API) --- */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playSword() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            playArrow() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.15);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playCannon() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(20, now + 0.4);
+
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+
+            playExplosion() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(25, now + 0.35);
+
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+
+            playNukeLaunch() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 1.2);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 1.2);
+            }
+
+            playNukeExplosion() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+
+                // Boato profondo a bassa frequenza
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 2.0);
+
+                gain.gain.setValueAtTime(0.9, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 2.0);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 2.0);
+            }
+
+            playVictory() {
+                if (!this.enabled) return;
+                this.init();
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const now = this.ctx.currentTime + (idx * 0.12);
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                });
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        /* --- STATO DEL GIOCO --- */
+        let state = {
+            phase: 'setup', // 'setup', 'battle', 'paused', 'ended'
+            activeTeam: 'red',
+            selectedUnitType: 'infantry',
+            redGold: INITIAL_GOLD,
+            blueGold: INITIAL_GOLD,
+            units: [],
+            projectiles: [],
+            particles: [],
+            shockwaves: [],
+            mushroomClouds: [],
+            floatingTexts: [],
+            tracks: [], // Cingoli/impronte
+            speedMultiplier: 1,
+            nextUnitId: 1,
+            stats: {
+                redInitial: 0,
+                blueInitial: 0,
+            },
+            terrainObjects: [],
+            bridges: [],
+            river: { xStart: 0, width: 80 }
+        };
+
+        const canvas = document.getElementById('battleCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width - 16;
+            canvas.height = rect.height - 16;
+            generateMapFeatures();
+        }
+
+        /* --- GENERAZIONE TERRENO TATTICO E PONTI SULLA NAVMESH --- */
+        function generateMapFeatures() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const riverWidth = 90; // Ponte leggermente più largo per facilitare il flusso
+            const riverX = w / 2 - riverWidth / 2;
+
+            state.river = { xStart: riverX, width: riverWidth };
+
+            // Ponti fissi a Nord, Centro, Sud con relativi waypoint d'ingresso, attraversamento ed uscita
+            const bridgeHeight = 80;
+            state.bridges = [
+                { id: 1, yCenter: h * 0.22, yMin: h * 0.22 - bridgeHeight/2, yMax: h * 0.22 + bridgeHeight/2 },
+                { id: 2, yCenter: h * 0.50, yMin: h * 0.50 - bridgeHeight/2, yMax: h * 0.50 + bridgeHeight/2 },
+                { id: 3, yCenter: h * 0.78, yMin: h * 0.78 - bridgeHeight/2, yMax: h * 0.78 + bridgeHeight/2 }
+            ];
+
+            // Calcola waypoint di navigazione per ciascun ponte
+            state.bridges.forEach(b => {
+                b.redEntry = { x: riverX - 35, y: b.yCenter };      // Punto d'approccio sinistro
+                b.midPoint = { x: riverX + riverWidth / 2, y: b.yCenter }; // Centro ponte
+                b.blueEntry = { x: riverX + riverWidth + 35, y: b.yCenter }; // Punto d'approccio destro
+            });
+
+            // Foreste e Rocce
+            state.terrainObjects = [];
+
+            // Foreste (rallentano ma non bloccano)
+            const forestCount = 6;
+            for (let i = 0; i < forestCount; i++) {
+                const isRedSide = i % 2 === 0;
+                const minX = isRedSide ? 50 : riverX + riverWidth + 50;
+                const maxX = isRedSide ? riverX - 70 : w - 70;
+
+                state.terrainObjects.push({
+                    type: 'forest',
+                    x: Math.random() * (maxX - minX) + minX,
+                    y: Math.random() * (h - 120) + 60,
+                    radius: Math.random() * 25 + 22
+                });
+            }
+
+            // Rocce (Insuperabili) - Lontane dai percorsi dei ponti
+            const rockCount = 4;
+            for (let i = 0; i < rockCount; i++) {
+                const isRedSide = i % 2 === 0;
+                const minX = isRedSide ? 100 : riverX + riverWidth + 100;
+                const maxX = isRedSide ? riverX - 100 : w - 100;
+
+                state.terrainObjects.push({
+                    type: 'rock',
+                    x: Math.random() * (maxX - minX) + minX,
+                    y: Math.random() * (h - 140) + 70,
+                    radius: Math.random() * 16 + 12
+                });
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        /* --- CLASSE UNITA CON NAVIGATION STATE MACHINE --- */
+        class Unit {
+            constructor(x, y, team, typeKey) {
+                const config = UNIT_TYPES[typeKey];
+                this.id = state.nextUnitId++;
+                this.x = x;
+                this.y = y;
+                this.team = team;
+                this.typeKey = typeKey;
+                this.name = config.name;
+                this.hp = config.hp;
+                this.maxHp = config.maxHp;
+                this.damage = config.damage;
+                this.range = config.range;
+                this.speed = config.speed;
+                this.static = config.static || false;
+                this.attackSpeed = config.attackSpeed;
+                this.size = config.size;
+                this.cost = config.cost;
+                this.areaDamage = config.areaDamage || false;
+                this.areaRadius = config.areaRadius || 0;
+
+                this.lastAttackTime = 0;
+                this.target = null;
+                this.kills = 0;
+                this.damageDealt = 0;
+
+                // Inizializza conto alla rovescia per il Sito Nucleare
+                if (this.typeKey === 'nukeSilo') {
+                    this.lastAttackTime = Date.now(); // Inizia a caricare subito all'inizio dello scontro
+                }
+
+                // Navigazione Ponte: 'DIRECT', 'APPROACHING_BRIDGE', 'CROSSING_BRIDGE', 'EXITING_BRIDGE'
+                this.navState = 'DIRECT';
+                this.assignedBridge = null;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Ombra
+                ctx.beginPath();
+                ctx.ellipse(0, this.size * 0.7, this.size, this.size * 0.4, 0, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.fill();
+
+                if (this.typeKey === 'nukeSilo') {
+                    // Silo Nucleare
+                    ctx.fillStyle = '#1e293b';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 1.1, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = this.team === 'red' ? '#ef4444' : '#3b82f6';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    // Portello interno
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.7, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Simbolo Nucleare / Icona
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.font = `${Math.floor(this.size * 0.9)}px "Font Awesome 6 Free"`;
+                    ctx.fontWeight = '900';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('\uf1c9', 0, 0);
+
+                    // Indicatore di Carica/Ricarica del Missile
+                    if (state.phase === 'battle' || state.phase === 'paused') {
+                        const elapsed = Date.now() - this.lastAttackTime;
+                        const chargeRatio = Math.min(1, elapsed / (this.attackSpeed / state.speedMultiplier));
+                        
+                        ctx.beginPath();
+                        ctx.arc(0, 0, this.size * 1.3, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * chargeRatio));
+                        ctx.strokeStyle = chargeRatio >= 1 ? '#22c55e' : '#f59e0b';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+                    }
+
+                } else if (this.typeKey === 'tank') {
+                    // Cingoli
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(-this.size, -this.size * 0.8, this.size * 2, this.size * 0.4);
+                    ctx.fillRect(-this.size, this.size * 0.4, this.size * 2, this.size * 0.4);
+
+                    // Scafo
+                    ctx.fillStyle = this.team === 'red' ? '#b91c1c' : '#1d4ed8';
+                    ctx.fillRect(-this.size * 0.8, -this.size * 0.6, this.size * 1.6, this.size * 1.2);
+
+                    // Torretta/Cannone
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Canna
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(this.team === 'red' ? this.size * 1.3 : -this.size * 1.3, 0);
+                    ctx.stroke();
+
+                } else if (this.typeKey === 'turret') {
+                    // Torretta Statica
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(-this.size * 0.9, -this.size * 0.9, this.size * 1.8, this.size * 1.8);
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(-this.size * 0.9, -this.size * 0.9, this.size * 1.8, this.size * 1.8);
+
+                    ctx.fillStyle = this.team === 'red' ? '#ef4444' : '#3b82f6';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.55, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `${Math.floor(this.size * 0.9)}px "Font Awesome 6 Free"`;
+                    ctx.fontWeight = '900';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('\uf520', 0, 0);
+
+                } else {
+                    // Truppa Standard
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.team === 'red' ? '#ef4444' : '#3b82f6';
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = this.team === 'red' ? '#991b1b' : '#1e40af';
+                    ctx.stroke();
+
+                    // Icona
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `${Math.floor(this.size * 1.1)}px "Font Awesome 6 Free"`;
+                    ctx.fontWeight = '900';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    let iconUnicode = '\uf013';
+                    if (this.typeKey === 'infantry') iconUnicode = '\uf13d';
+                    else if (this.typeKey === 'knight') iconUnicode = '\uf7ab';
+                    else if (this.typeKey === 'archer') iconUnicode = '\uf6b9';
+                    else if (this.typeKey === 'sniper') iconUnicode = '\uf05b';
+                    else if (this.typeKey === 'mage') iconUnicode = '\uf72b';
+                    else if (this.typeKey === 'catapult') iconUnicode = '\uf52c';
+
+                    ctx.fillText(iconUnicode, 0, 1);
+                }
+
+                // Barra Salute
+                const barW = this.size * 2.4;
+                const barH = 4;
+                const barY = -this.size - 8;
+                const hpPercent = Math.max(0, this.hp / this.maxHp);
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(-barW / 2, barY, barW, barH);
+
+                ctx.fillStyle = hpPercent > 0.5 ? '#22c55e' : (hpPercent > 0.25 ? '#eab308' : '#f43f5e');
+                ctx.fillRect(-barW / 2, barY, barW * hpPercent, barH);
+
+                ctx.restore();
+            }
+
+            update() {
+                if (state.phase !== 'battle') return;
+
+                // Logica specifica per il Sito Nucleare
+                if (this.typeKey === 'nukeSilo') {
+                    const now = Date.now();
+                    if (now - this.lastAttackTime >= (this.attackSpeed / state.speedMultiplier)) {
+                        const targetArea = this.findHighDensityTarget();
+                        if (targetArea) {
+                            this.attack(targetArea);
+                            this.lastAttackTime = now;
+                        }
+                    }
+                    return;
+                }
+
+                // Trova bersaglio standard per altre unità
+                if (!this.target || this.target.hp <= 0) {
+                    this.target = this.findClosestEnemy();
+                    this.navState = 'DIRECT';
+                    this.assignedBridge = null;
+                }
+
+                if (this.target) {
+                    const directDist = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+
+                    // Ingaggio a distanza
+                    if (directDist <= this.range) {
+                        const now = Date.now();
+                        if (now - this.lastAttackTime >= (this.attackSpeed / state.speedMultiplier)) {
+                            this.attack(this.target);
+                            this.lastAttackTime = now;
+                        }
+                        return; // Ferma il movimento durante l'attacco
+                    }
+
+                    // Se è una torretta statica, non muoverti
+                    if (this.static) return;
+
+                    // --- SISTEMA DI NAVIGATION-WAYPOINTS RIGIDO PER PONTI ---
+                    let wayPoint = { x: this.target.x, y: this.target.y };
+
+                    const riv = state.river;
+                    const onRedSide = this.x < riv.xStart;
+                    const onBlueSide = this.x > (riv.xStart + riv.width);
+                    const targetOnRedSide = this.target.x < riv.xStart;
+                    const targetOnBlueSide = this.target.x > (riv.xStart + riv.width);
+
+                    // Necessita attraversare il fiume
+                    const needsToCross = (onRedSide && targetOnBlueSide) || (onBlueSide && targetOnRedSide);
+
+                    if (needsToCross) {
+                        // Seleziona il ponte più vicino se non già assegnato
+                        if (!this.assignedBridge) {
+                            let closestB = state.bridges[0];
+                            let minDist = Math.abs(this.y - closestB.yCenter);
+
+                            for (let b of state.bridges) {
+                                const dist = Math.abs(this.y - b.yCenter);
+                                if (dist < minDist) {
+                                    minDist = dist;
+                                    closestB = b;
+                                }
+                            }
+                            this.assignedBridge = closestB;
+                            this.navState = 'APPROACHING_BRIDGE';
+                        }
+
+                        // Macchina a stati per attraversamento sequenziale del ponte
+                        if (this.navState === 'APPROACHING_BRIDGE') {
+                            wayPoint = onRedSide ? this.assignedBridge.redEntry : this.assignedBridge.blueEntry;
+                            if (Math.hypot(this.x - wayPoint.x, this.y - wayPoint.y) < 25) {
+                                this.navState = 'CROSSING_BRIDGE';
+                            }
+                        } else if (this.navState === 'CROSSING_BRIDGE') {
+                            wayPoint = this.assignedBridge.midPoint;
+                            if (Math.hypot(this.x - wayPoint.x, this.y - wayPoint.y) < 25) {
+                                this.navState = 'EXITING_BRIDGE';
+                            }
+                        } else if (this.navState === 'EXITING_BRIDGE') {
+                            wayPoint = onRedSide ? this.assignedBridge.blueEntry : this.assignedBridge.redEntry;
+                            if (Math.hypot(this.x - wayPoint.x, this.y - wayPoint.y) < 25) {
+                                this.navState = 'DIRECT'; // Fiume superato con successo!
+                            }
+                        }
+                    } else {
+                        this.navState = 'DIRECT';
+                        this.assignedBridge = null;
+                    }
+
+                    // Calcolo vettore direzione verso il waypoint attivo
+                    let dx = wayPoint.x - this.x;
+                    let dy = wayPoint.y - this.y;
+                    let dist = Math.hypot(dx, dy);
+
+                    // Calcolo velocità & effetto rallentamento Foreste
+                    let currentSpeed = this.speed;
+                    for (let obj of state.terrainObjects) {
+                        if (obj.type === 'forest') {
+                            if (Math.hypot(obj.x - this.x, obj.y - this.y) <= obj.radius) {
+                                currentSpeed *= 0.6; // Rallentamento 40% nelle foreste
+                                break;
+                            }
+                        }
+                    }
+
+                    if (dist > 1.5) {
+                        let stepX = (dx / dist) * currentSpeed * state.speedMultiplier;
+                        let stepY = (dy / dist) * currentSpeed * state.speedMultiplier;
+
+                        // FISICA DI SPINTA E SEPARAZIONE TRUPPE (Evita che si incastrino fra loro sui ponti)
+                        let pushX = 0;
+                        let pushY = 0;
+                        for (let other of state.units) {
+                            if (other !== this && other.hp > 0) {
+                                const overlapDist = Math.hypot(other.x - this.x, other.y - this.y);
+                                const minDist = this.size + other.size + 2;
+                                if (overlapDist < minDist && overlapDist > 0) {
+                                    const force = (minDist - overlapDist) / minDist;
+                                    pushX -= ((other.x - this.x) / overlapDist) * force * 0.8;
+                                    pushY -= ((other.y - this.y) / overlapDist) * force * 0.8;
+                                }
+                            }
+                        }
+
+                        // Evita Rocce
+                        for (let obj of state.terrainObjects) {
+                            if (obj.type === 'rock') {
+                                const nextX = this.x + stepX;
+                                const nextY = this.y + stepY;
+                                if (Math.hypot(obj.x - nextX, obj.y - nextY) <= (obj.radius + this.size)) {
+                                    stepX = -stepY;
+                                    stepY = stepX;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Genera tracce dei cingoli se è un Carro Armato
+                        if (this.typeKey === 'tank' && Math.random() < 0.25) {
+                            state.tracks.push({ x: this.x, y: this.y, life: 70 });
+                        }
+
+                        this.x += stepX + pushX;
+                        this.y += stepY + pushY;
+                    }
+                }
+            }
+
+            findClosestEnemy() {
+                let closest = null;
+                let minDist = Infinity;
+
+                for (let unit of state.units) {
+                    if (unit.team !== this.team && unit.hp > 0) {
+                        const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = unit;
+                        }
+                    }
+                }
+                return closest;
+            }
+
+            findHighDensityTarget() {
+                const enemies = state.units.filter(u => u.team !== this.team && u.hp > 0);
+                if (enemies.length === 0) return null;
+
+                let bestTarget = enemies[0];
+                let maxDensity = -1;
+
+                enemies.forEach(candidate => {
+                    let countAround = 0;
+                    enemies.forEach(other => {
+                        if (Math.hypot(other.x - candidate.x, other.y - candidate.y) <= 120) {
+                            countAround++;
+                        }
+                    });
+                    if (countAround > maxDensity) {
+                        maxDensity = countAround;
+                        bestTarget = candidate;
+                    }
+                });
+
+                return bestTarget;
+            }
+
+            attack(target) {
+                if (this.typeKey === 'nukeSilo') {
+                    // Lancia il missile nucleare balistico
+                    state.projectiles.push(new Projectile(this.x, this.y, target, this.damage, this.team, this.typeKey, true, this.areaRadius, this));
+                    sound.playNukeLaunch();
+                    logMessage(`ATTENZIONE: LANCELLATO MISSILE ATOMICO DA FAZIONE ${this.team.toUpperCase()}!`, 'error');
+                } else if (this.typeKey === 'tank') {
+                    state.projectiles.push(new Projectile(this.x, this.y, target, this.damage, this.team, this.typeKey, true, this.areaRadius, this));
+                    sound.playCannon();
+                } else if (this.typeKey === 'turret') {
+                    state.projectiles.push(new Projectile(this.x, this.y, target, this.damage, this.team, this.typeKey, false, 0, this));
+                    sound.playSword();
+                } else if (this.typeKey === 'sniper') {
+                    state.projectiles.push(new Projectile(this.x, this.y, target, this.damage, this.team, this.typeKey, false, 0, this));
+                    sound.playArrow();
+                } else if (this.typeKey === 'archer' || this.typeKey === 'mage' || this.typeKey === 'catapult') {
+                    state.projectiles.push(new Projectile(this.x, this.y, target, this.damage, this.team, this.typeKey, this.areaDamage, this.areaRadius, this));
+                    if (this.typeKey === 'archer') sound.playArrow();
+                    else sound.playExplosion();
+                } else {
+                    // Corpo a corpo
+                    target.takeDamage(this.damage, this);
+                    sound.playSword();
+                    createHitParticles(target.x, target.y, this.team === 'red' ? '#ef4444' : '#3b82f6');
+                }
+            }
+
+            takeDamage(amount, attacker) {
+                this.hp -= amount;
+                addFloatingText(`-${Math.round(amount)}`, this.x, this.y - 15, '#f87171');
+
+                if (attacker) attacker.damageDealt += amount;
+
+                if (this.hp <= 0) {
+                    if (attacker) attacker.kills++;
+                    createDeathParticles(this.x, this.y);
+                }
+            }
+        }
+
+        /* --- CLASSE PROIETTILE --- */
+        class Projectile {
+            constructor(x, y, target, damage, team, typeKey, areaDamage, areaRadius, shooter) {
+                this.x = x;
+                this.y = y;
+                this.startX = x;
+                this.startY = y;
+                this.targetX = target.x;
+                this.targetY = target.y;
+                this.targetUnit = target;
+                this.damage = damage;
+                this.team = team;
+                this.typeKey = typeKey;
+                this.areaDamage = areaDamage;
+                this.areaRadius = areaRadius;
+                this.shooter = shooter;
+
+                this.speed = typeKey === 'nukeSilo' ? 3.5 : (typeKey === 'sniper' ? 15 : (typeKey === 'tank' ? 9 : (typeKey === 'catapult' ? 4 : 7)));
+                this.progress = 0;
+                const totalDist = Math.hypot(this.targetX - x, this.targetY - y);
+                this.duration = totalDist / this.speed;
+            }
+
+            update() {
+                this.progress += 1 * state.speedMultiplier;
+                const t = Math.min(1, this.progress / this.duration);
+
+                let currentX = this.startX + (this.targetX - this.startX) * t;
+                let currentY = this.startY + (this.targetY - this.startY) * t;
+
+                if (this.typeKey === 'nukeSilo') {
+                    // Parabola altissima per il missile nucleare
+                    const height = 220 * Math.sin(t * Math.PI);
+                    currentY -= height;
+
+                    // Scia di fumo del missile
+                    if (Math.random() < 0.6) {
+                        state.particles.push({
+                            x: currentX,
+                            y: currentY,
+                            vx: (Math.random() - 0.5) * 1.5,
+                            vy: (Math.random() - 0.5) * 1.5,
+                            life: 30,
+                            maxLife: 30,
+                            color: '#94a3b8',
+                            size: Math.random() * 5 + 4
+                        });
+                    }
+                } else if (this.typeKey === 'catapult') {
+                    const height = 90 * Math.sin(t * Math.PI);
+                    currentY -= height;
+                }
+
+                this.x = currentX;
+                this.y = currentY;
+
+                if (t >= 1) {
+                    this.onImpact();
+                    return true;
+                }
+                return false;
+            }
+
+            draw() {
+                ctx.save();
+                if (this.typeKey === 'nukeSilo') {
+                    // Missile Atomico
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 15;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.typeKey === 'tank') {
+                    ctx.fillStyle = '#f97316';
+                    ctx.shadowColor = '#ea580c';
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.typeKey === 'sniper') {
+                    ctx.strokeStyle = '#fef08a';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.startX, this.startY);
+                    ctx.lineTo(this.x, this.y);
+                    ctx.stroke();
+                } else if (this.typeKey === 'archer' || this.typeKey === 'turret') {
+                    ctx.fillStyle = '#fef08a';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.typeKey === 'mage') {
+                    ctx.fillStyle = '#c084fc';
+                    ctx.shadowColor = '#a855f7';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.typeKey === 'catapult') {
+                    ctx.fillStyle = '#78350f';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            onImpact() {
+                if (this.typeKey === 'nukeSilo') {
+                    // DETONAZIONE ATOMICA DEVASTANTE
+                    sound.playNukeExplosion();
+                    triggerNuclearExplosion(this.targetX, this.targetY, this.areaRadius, this.damage, this.shooter);
+                } else if (this.areaDamage) {
+                    sound.playExplosion();
+                    createExplosionParticles(this.targetX, this.targetY, this.typeKey === 'tank' ? '#f97316' : '#c084fc');
+                    for (let u of state.units) {
+                        if (u.team !== this.team && u.hp > 0) {
+                            const dist = Math.hypot(u.x - this.targetX, u.y - this.targetY);
+                            if (dist <= this.areaRadius) {
+                                u.takeDamage(this.damage, this.shooter);
+                            }
+                        }
+                    }
+                } else {
+                    if (this.targetUnit && this.targetUnit.hp > 0) {
+                        this.targetUnit.takeDamage(this.damage, this.shooter);
+                    }
+                }
+            }
+        }
+
+        /* --- DETONAZIONE ED EFFETTO FUNGO ATOMICO --- */
+        function triggerNuclearExplosion(x, y, radius, damage, shooter) {
+            // Onda d'urto ad anello
+            state.shockwaves.push({
+                x, y,
+                radius: 10,
+                maxRadius: radius + 20,
+                life: 40,
+                maxLife: 40
+            });
+
+            // Animazione Fungo Atomico (Mushroom Cloud)
+            state.mushroomClouds.push({
+                x, y,
+                radius: 15,
+                maxRadius: radius,
+                life: 90,
+                maxLife: 90
+            });
+
+            // Particelle incandescenti ed fumo
+            for (let i = 0; i < 90; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 11 + 2;
+                state.particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: Math.random() * 50 + 40,
+                    maxLife: 90,
+                    color: Math.random() < 0.5 ? '#f97316' : (Math.random() < 0.5 ? '#ef4444' : '#fbbf24'),
+                    size: Math.random() * 8 + 4
+                });
+            }
+
+            // Infliggi danno ad area e spingi/sposta le truppe nel raggio
+            for (let u of state.units) {
+                if (u.hp > 0) {
+                    const dist = Math.hypot(u.x - x, u.y - y);
+                    if (dist <= radius) {
+                        const falloff = 1 - (dist / radius) * 0.4; // Minimo 60% del danno al bordo
+                        u.takeDamage(damage * falloff, shooter);
+
+                        // Effetto spinta dall'onda d'urto
+                        if (!u.static && dist > 0) {
+                            const pushForce = (radius - dist) * 0.35;
+                            u.x += ((u.x - x) / dist) * pushForce;
+                            u.y += ((u.y - y) / dist) * pushForce;
+                        }
+                    }
+                }
+            }
+        }
+
+        /* --- PARTICELLE ED EFFETTI --- */
+        function createHitParticles(x, y, color) {
+            for (let i = 0; i < 6; i++) {
+                state.particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 15,
+                    maxLife: 15,
+                    color,
+                    size: Math.random() * 3 + 2
+                });
+            }
+        }
+
+        function createDeathParticles(x, y) {
+            for (let i = 0; i < 14; i++) {
+                state.particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    life: 25,
+                    maxLife: 25,
+                    color: '#64748b',
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function createExplosionParticles(x, y, color) {
+            for (let i = 0; i < 22; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 6 + 1;
+                state.particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 22,
+                    maxLife: 22,
+                    color,
+                    size: Math.random() * 5 + 3
+                });
+            }
+        }
+
+        function addFloatingText(text, x, y, color) {
+            state.floatingTexts.push({ text, x, y, color, life: 30, maxLife: 30 });
+        }
+
+        /* --- RENDER TERRENO E PONTI SULLA MAPPA --- */
+        function drawTerrain() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Sfondo Erba
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(0, 0, w, h);
+
+            // Trama Erba
+            ctx.fillStyle = '#166534';
+            for (let x = 15; x < w; x += 50) {
+                for (let y = 15; y < h; y += 50) {
+                    ctx.fillRect(x + (y % 30), y, 10, 10);
+                }
+            }
+
+            // Tracce Cingoli
+            for (let i = state.tracks.length - 1; i >= 0; i--) {
+                const tr = state.tracks[i];
+                ctx.fillStyle = 'rgba(30, 41, 59, 0.4)';
+                ctx.fillRect(tr.x - 4, tr.y - 4, 8, 8);
+                tr.life--;
+                if (tr.life <= 0) state.tracks.splice(i, 1);
+            }
+
+            // Fiume
+            const riv = state.river;
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(riv.xStart, 0, riv.width, h);
+
+            // Onde Fiume
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            const time = Date.now() * 0.003;
+            for (let y = 10; y < h; y += 30) {
+                ctx.beginPath();
+                const waveX = riv.xStart + 18 + Math.sin(y * 0.05 + time) * 8;
+                ctx.moveTo(waveX, y);
+                ctx.lineTo(waveX + 30, y);
+                ctx.stroke();
+            }
+
+            // Disegno PONTI FISSI LARGHI
+            state.bridges.forEach(b => {
+                const bridgeH = b.yMax - b.yMin;
+
+                // Struttura Legno/Pietra
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(riv.xStart - 15, b.yMin, riv.width + 30, bridgeH);
+
+                // Assi di Legno
+                ctx.strokeStyle = '#451a03';
+                ctx.lineWidth = 3;
+                for (let bx = riv.xStart - 15; bx <= riv.xStart + riv.width + 15; bx += 10) {
+                    ctx.beginPath();
+                    ctx.moveTo(bx, b.yMin);
+                    ctx.lineTo(bx, b.yMax);
+                    ctx.stroke();
+                }
+
+                // Ringhiere
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(riv.xStart - 15, b.yMin - 4, riv.width + 30, 6);
+                ctx.fillRect(riv.xStart - 15, b.yMax - 2, riv.width + 30, 6);
+            });
+
+            // Foreste e Rocce
+            state.terrainObjects.forEach(obj => {
+                if (obj.type === 'forest') {
+                    ctx.fillStyle = 'rgba(20, 83, 45, 0.85)';
+                    ctx.beginPath();
+                    ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#14532d';
+                    ctx.beginPath();
+                    ctx.arc(obj.x - 8, obj.y - 5, obj.radius * 0.6, 0, Math.PI * 2);
+                    ctx.arc(obj.x + 8, obj.y + 5, obj.radius * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (obj.type === 'rock') {
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            });
+
+            // Zone di Schieramento
+            if (state.phase === 'setup') {
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+                ctx.fillRect(10, 10, riv.xStart - 35, h - 20);
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 6]);
+                ctx.strokeRect(10, 10, riv.xStart - 35, h - 20);
+
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+                ctx.fillRect(riv.xStart + riv.width + 25, 10, w - (riv.xStart + riv.width + 35), h - 20);
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+                ctx.strokeRect(riv.xStart + riv.width + 25, 10, w - (riv.xStart + riv.width + 35), h - 20);
+                ctx.setLineDash([]);
+            }
+        }
+
+        /* --- GAME LOOP PRINCIPALE --- */
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawTerrain();
+
+            // Aggiorna e Disegna Unità
+            state.units.forEach(unit => {
+                unit.update();
+                unit.draw();
+            });
+
+            state.units = state.units.filter(u => u.hp > 0);
+
+            // Proiettili
+            for (let i = state.projectiles.length - 1; i >= 0; i--) {
+                const p = state.projectiles[i];
+                p.draw();
+                if (p.update()) {
+                    state.projectiles.splice(i, 1);
+                }
+            }
+
+            // Onde d'urto nucleari
+            for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+                const sw = state.shockwaves[i];
+                sw.radius += (sw.maxRadius - sw.radius) * 0.1;
+                sw.life--;
+
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 6 * (sw.life / sw.maxLife);
+                ctx.globalAlpha = sw.life / sw.maxLife;
+                ctx.beginPath();
+                ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+
+                if (sw.life <= 0) state.shockwaves.splice(i, 1);
+            }
+
+            // Funghi Atomici (Mushroom Cloud)
+            for (let i = state.mushroomClouds.length - 1; i >= 0; i--) {
+                const mc = state.mushroomClouds[i];
+                mc.life--;
+                const progress = 1 - (mc.life / mc.maxLife);
+
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, mc.life / 20);
+
+                // Gambo del fungo
+                const stemW = 20 + progress * 15;
+                const stemH = 60 + progress * 40;
+                const gradStem = ctx.createLinearGradient(mc.x, mc.y, mc.x, mc.y - stemH);
+                gradStem.addColorStop(0, '#f97316');
+                gradStem.addColorStop(0.5, '#ea580c');
+                gradStem.addColorStop(1, '#475569');
+
+                ctx.fillStyle = gradStem;
+                ctx.beginPath();
+                ctx.moveTo(mc.x - stemW / 2, mc.y);
+                ctx.lineTo(mc.x - stemW / 4, mc.y - stemH);
+                ctx.lineTo(mc.x + stemW / 4, mc.y - stemH);
+                ctx.lineTo(mc.x + stemW / 2, mc.y);
+                ctx.fill();
+
+                // Cappella del fungo atomico
+                const capY = mc.y - stemH;
+                const capR = 25 + progress * (mc.maxRadius * 0.7);
+
+                const gradCap = ctx.createRadialGradient(mc.x, capY, 5, mc.x, capY, capR);
+                gradCap.addColorStop(0, '#fef08a');
+                gradCap.addColorStop(0.3, '#f97316');
+                gradCap.addColorStop(0.7, '#dc2626');
+                gradCap.addColorStop(1, 'rgba(30, 41, 59, 0.8)');
+
+                ctx.fillStyle = gradCap;
+                ctx.beginPath();
+                ctx.arc(mc.x, capY, capR, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+
+                if (mc.life <= 0) state.mushroomClouds.splice(i, 1);
+            }
+
+            // Particelle
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const pt = state.particles[i];
+                pt.x += pt.vx;
+                pt.y += pt.vy;
+                pt.life--;
+
+                ctx.fillStyle = pt.color;
+                ctx.globalAlpha = pt.life / pt.maxLife;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+
+                if (pt.life <= 0) state.particles.splice(i, 1);
+            }
+
+            // Testi Fluttuanti
+            for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+                const ft = state.floatingTexts[i];
+                ft.y -= 0.6;
+                ft.life--;
+
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 12px Inter';
+                ctx.globalAlpha = ft.life / ft.maxLife;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.globalAlpha = 1.0;
+
+                if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+            }
+
+            if (state.phase === 'battle') {
+                checkVictoryConditions();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* --- INTERFACCIA E CONTROLLI --- */
+        function initUI() {
+            renderUnitSelectionCards();
+            updateGoldDisplays();
+            updateUnitInspector(UNIT_TYPES.infantry);
+
+            document.getElementById('selectRedBtn').addEventListener('click', () => setActiveTeam('red'));
+            document.getElementById('selectBlueBtn').addEventListener('click', () => setActiveTeam('blue'));
+
+            canvas.addEventListener('pointerdown', handleCanvasClick);
+
+            document.getElementById('startBattleBtn').addEventListener('click', startBattle);
+            document.getElementById('pauseBattleBtn').addEventListener('click', togglePause);
+            document.getElementById('clearBoardBtn').addEventListener('click', clearBoard);
+            document.getElementById('resetAllBtn').addEventListener('click', clearBoard);
+
+            document.getElementById('speed1x').addEventListener('click', () => setSpeed(1));
+            document.getElementById('speed2x').addEventListener('click', () => setSpeed(2));
+            document.getElementById('speed4x').addEventListener('click', () => setSpeed(4));
+
+            document.getElementById('aiFillRedBtn').addEventListener('click', () => generateAIUnits('red'));
+            document.getElementById('aiFillBlueBtn').addEventListener('click', () => generateAIUnits('blue'));
+
+            document.getElementById('audioToggleBtn').addEventListener('click', () => {
+                sound.enabled = !sound.enabled;
+                document.getElementById('audioStatus').innerText = sound.enabled ? 'Audio On' : 'Audio Off';
+                document.getElementById('audioIcon').className = sound.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+            });
+
+            document.getElementById('closeModalBtn').addEventListener('click', () => {
+                document.getElementById('victoryModal').classList.add('hidden');
+            });
+        }
+
+        function renderUnitSelectionCards() {
+            const container = document.getElementById('unitSelectionContainer');
+            container.innerHTML = '';
+
+            Object.values(UNIT_TYPES).forEach(unit => {
+                const isSelected = state.selectedUnitType === unit.id;
+                const card = document.createElement('div');
+                card.className = `unit-card p-2.5 rounded-xl border border-amber-900/40 bg-slate-900/90 cursor-pointer flex items-center justify-between ${isSelected ? 'selected gold-border' : 'hover:bg-slate-800'}`;
+                
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-slate-800 border border-amber-600/30 flex items-center justify-center text-amber-400 text-base">
+                            <i class="fa-solid ${unit.icon}"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-slate-100">${unit.name}</div>
+                            <div class="text-[11px] text-amber-400 flex items-center gap-1 font-semibold">
+                                <i class="fa-solid fa-coins text-[10px]"></i> ${unit.cost} Oro
+                            </div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-600 text-xs"></i>
+                `;
+
+                card.addEventListener('click', () => {
+                    state.selectedUnitType = unit.id;
+                    renderUnitSelectionCards();
+                    updateUnitInspector(unit);
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function setActiveTeam(team) {
+            state.activeTeam = team;
+            const redBtn = document.getElementById('selectRedBtn');
+            const blueBtn = document.getElementById('selectBlueBtn');
+            const badge = document.getElementById('activeTeamIndicator');
+
+            if (team === 'red') {
+                redBtn.className = 'py-2.5 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 border-red-500 bg-red-950/60 text-red-300';
+                blueBtn.className = 'py-2.5 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 border-transparent bg-slate-800/80 text-slate-400 hover:text-blue-300 transition';
+                badge.className = 'text-xs px-2 py-1 rounded bg-red-950 text-red-400 border border-red-700 font-sans font-bold';
+                badge.innerText = 'ROSSO';
+            } else {
+                blueBtn.className = 'py-2.5 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 border-blue-500 bg-blue-950/60 text-blue-300';
+                redBtn.className = 'py-2.5 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 border-transparent bg-slate-800/80 text-slate-400 hover:text-red-300 transition';
+                badge.className = 'text-xs px-2 py-1 rounded bg-blue-950 text-blue-400 border border-blue-700 font-sans font-bold';
+                badge.innerText = 'BLU';
+            }
+        }
+
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (state.phase !== 'setup') {
+                const clickedUnit = state.units.find(u => Math.hypot(u.x - x, u.y - y) <= u.size * 1.5);
+                if (clickedUnit) {
+                    updateUnitInspector(UNIT_TYPES[clickedUnit.typeKey], clickedUnit);
+                }
+                return;
+            }
+
+            const riv = state.river;
+
+            if (state.activeTeam === 'red' && x > (riv.xStart - 25)) {
+                logMessage('Schiera l\'Esercito Rosso a SINISTRA del fiume!', 'error');
+                return;
+            }
+            if (state.activeTeam === 'blue' && x < (riv.xStart + riv.width + 25)) {
+                logMessage('Schiera l\'Esercito Blu a DESTRO del fiume!', 'error');
+                return;
+            }
+
+            const config = UNIT_TYPES[state.selectedUnitType];
+            const currentGold = state.activeTeam === 'red' ? state.redGold : state.blueGold;
+
+            if (currentGold < config.cost) {
+                logMessage('Oro insufficiente per arruolare questa unità!', 'error');
+                return;
+            }
+
+            if (state.activeTeam === 'red') state.redGold -= config.cost;
+            else state.blueGold -= config.cost;
+
+            const unit = new Unit(x, y, state.activeTeam, state.selectedUnitType);
+            state.units.push(unit);
+
+            updateGoldDisplays();
+            updateUnitCounters();
+            logMessage(`Schierato ${config.name} (${state.activeTeam.toUpperCase()})`);
+        }
+
+        function generateAIUnits(team) {
+            if (state.phase === 'setup') {
+                const riv = state.river;
+                const minX = team === 'red' ? 30 : riv.xStart + riv.width + 30;
+                const maxX = team === 'red' ? riv.xStart - 35 : canvas.width - 30;
+
+                let gold = team === 'red' ? state.redGold : state.blueGold;
+                const unitKeys = Object.keys(UNIT_TYPES);
+
+                while (gold >= 50) {
+                    const randomKey = unitKeys[Math.floor(Math.random() * unitKeys.length)];
+                    const cost = UNIT_TYPES[randomKey].cost;
+
+                    if (gold >= cost) {
+                        const x = Math.random() * (maxX - minX) + minX;
+                        const y = Math.random() * (canvas.height - 60) + 30;
+
+                        state.units.push(new Unit(x, y, team, randomKey));
+                        gold -= cost;
+                    }
+                }
+
+                if (team === 'red') state.redGold = gold;
+                else state.blueGold = gold;
+
+                updateGoldDisplays();
+                updateUnitCounters();
+                logMessage(`Generazione casuale esercito ${team.toUpperCase()} completata!`);
+            }
+        }
+
+        function startBattle() {
+            const redCount = state.units.filter(u => u.team === 'red').length;
+            const blueCount = state.units.filter(u => u.team === 'blue').length;
+
+            if (redCount === 0 || blueCount === 0) {
+                logMessage('Entrambe le fazioni devono avere almeno un soldato!', 'error');
+                return;
+            }
+
+            state.phase = 'battle';
+            state.stats.redInitial = redCount;
+            state.stats.blueInitial = blueCount;
+
+            // Inizializza i timer del Sito Nucleare all'avvio reale del tempo di battaglia
+            state.units.forEach(u => {
+                if (u.typeKey === 'nukeSilo') {
+                    u.lastAttackTime = Date.now();
+                }
+            });
+
+            document.getElementById('startBattleBtn').classList.add('hidden');
+            document.getElementById('pauseBattleBtn').classList.remove('hidden');
+            document.getElementById('phaseBadge').innerHTML = '<i class="fa-solid fa-swords text-rose-500"></i> BATTAGLIA IN CORSO';
+            document.getElementById('phaseBadge').className = 'absolute top-4 left-1/2 -translate-x-1/2 bg-red-950/90 text-red-400 font-cinzel font-bold px-4 py-1.5 rounded-full border border-red-500 shadow-lg text-sm tracking-wide pointer-events-none flex items-center gap-2 animate-pulse';
+
+            logMessage('--- LA BATTAGLIA TATTICA È INIZIATA! ---');
+        }
+
+        function togglePause() {
+            if (state.phase === 'battle') {
+                state.phase = 'paused';
+                document.getElementById('pauseBattleBtn').innerHTML = '<i class="fa-solid fa-play"></i> Riprendi';
+                logMessage('Scontro in Pausa');
+            } else if (state.phase === 'paused') {
+                state.phase = 'battle';
+                document.getElementById('pauseBattleBtn').innerHTML = '<i class="fa-solid fa-pause"></i> Pausa';
+                logMessage('Scontro Ripreso');
+            }
+        }
+
+        function setSpeed(spd) {
+            state.speedMultiplier = spd;
+            ['speed1x', 'speed2x', 'speed4x'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.className = 'px-2.5 py-1 text-xs font-bold rounded text-slate-400 hover:text-white';
+            });
+            document.getElementById(`speed${spd}x`).className = 'px-2.5 py-1 text-xs font-bold rounded bg-amber-500 text-slate-950';
+        }
+
+        function clearBoard() {
+            state.units = [];
+            state.projectiles = [];
+            state.particles = [];
+            state.shockwaves = [];
+            state.mushroomClouds = [];
+            state.floatingTexts = [];
+            state.tracks = [];
+            state.redGold = INITIAL_GOLD;
+            state.blueGold = INITIAL_GOLD;
+            state.phase = 'setup';
+
+            document.getElementById('startBattleBtn').classList.remove('hidden');
+            document.getElementById('pauseBattleBtn').classList.add('hidden');
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('phaseBadge').innerHTML = '<i class="fa-solid fa-map-location-dot"></i> FASE DI SCHIERAMENTO';
+            document.getElementById('phaseBadge').className = 'absolute top-4 left-1/2 -translate-x-1/2 bg-amber-950/90 text-amber-400 font-cinzel font-bold px-4 py-1.5 rounded-full border border-amber-500 shadow-lg text-sm tracking-wide pointer-events-none flex items-center gap-2';
+
+            updateGoldDisplays();
+            updateUnitCounters();
+            logMessage('Campo resettato. Pronti per una nuova battaglia.');
+        }
+
+        function checkVictoryConditions() {
+            const redRemaining = state.units.filter(u => u.team === 'red').length;
+            const blueRemaining = state.units.filter(u => u.team === 'blue').length;
+
+            if (redRemaining === 0 || blueRemaining === 0) {
+                state.phase = 'ended';
+                sound.playVictory();
+
+                const winnerBanner = document.getElementById('winnerBanner');
+                if (redRemaining > 0) {
+                    winnerBanner.innerText = 'VITTORIA DELL\'ESERCITO ROSSO!';
+                    winnerBanner.className = 'py-3 px-6 rounded-xl font-cinzel font-black text-xl mb-4 bg-red-900 border border-red-500 text-red-200 uppercase tracking-wider shadow-lg';
+                } else if (blueRemaining > 0) {
+                    winnerBanner.innerText = 'VITTORIA DELL\'ESERCITO BLU!';
+                    winnerBanner.className = 'py-3 px-6 rounded-xl font-cinzel font-black text-xl mb-4 bg-blue-900 border border-blue-500 text-blue-200 uppercase tracking-wider shadow-lg';
+                } else {
+                    winnerBanner.innerText = 'PAREGGIO DEVASTANTE!';
+                    winnerBanner.className = 'py-3 px-6 rounded-xl font-cinzel font-black text-xl mb-4 bg-slate-800 border border-amber-500 text-amber-400 uppercase tracking-wider shadow-lg';
+                }
+
+                let mvp = null;
+                let maxKills = -1;
+                state.units.forEach(u => {
+                    if (u.kills > maxKills) {
+                        maxKills = u.kills;
+                        mvp = u;
+                    }
+                });
+
+                document.getElementById('statRedKills').innerText = `${state.stats.redInitial - redRemaining} / ${state.stats.redInitial} caduti`;
+                document.getElementById('statBlueKills').innerText = `${state.stats.blueInitial - blueRemaining} / ${state.stats.blueInitial} caduti`;
+                document.getElementById('statMVP').innerText = mvp ? `${mvp.name} (${mvp.team.toUpperCase()}) - ${mvp.kills} uccisioni` : 'Nessuno';
+
+                document.getElementById('victoryModal').classList.remove('hidden');
+                logMessage('--- SCONTRO TERMINATO ---');
+            }
+        }
+
+        function updateGoldDisplays() {
+            document.getElementById('redGoldDisplay').innerText = `${state.redGold} / ${INITIAL_GOLD}`;
+            document.getElementById('redGoldBar').style.width = `${(state.redGold / INITIAL_GOLD) * 100}%`;
+
+            document.getElementById('blueGoldDisplay').innerText = `${state.blueGold} / ${INITIAL_GOLD}`;
+            document.getElementById('blueGoldBar').style.width = `${(state.blueGold / INITIAL_GOLD) * 100}%`;
+        }
+
+        function updateUnitCounters() {
+            document.getElementById('unitCounterBadge').innerText = `${state.units.length} Unità Presenti`;
+        }
+
+        function updateUnitInspector(config, activeUnitInstance = null) {
+            const container = document.getElementById('inspectorContent');
+
+            if (activeUnitInstance) {
+                container.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center border-b border-amber-900/40 pb-2">
+                            <span class="font-bold text-amber-400 text-sm flex items-center gap-2">
+                                <i class="fa-solid ${config.icon}"></i> ${activeUnitInstance.name}
+                            </span>
+                            <span class="text-xs px-2 py-0.5 rounded ${activeUnitInstance.team === 'red' ? 'bg-red-950 text-red-400 border border-red-700' : 'bg-blue-950 text-blue-400 border border-blue-700'} uppercase font-bold">
+                                ${activeUnitInstance.team}
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-300">
+                            <div>Vita: <b class="text-emerald-400">${Math.max(0, Math.round(activeUnitInstance.hp))} / ${activeUnitInstance.maxHp}</b></div>
+                            <div>Danno: <b class="text-amber-400">${activeUnitInstance.damage}</b></div>
+                            <div>Gittata: <b>${activeUnitInstance.range}px</b></div>
+                            <div>Velocità: <b>${activeUnitInstance.speed}</b></div>
+                            <div class="col-span-2 pt-1 border-t border-slate-800 text-amber-200">
+                                Uccisioni: <b class="text-white">${activeUnitInstance.kills}</b> | Danno Inflitto: <b class="text-white">${Math.round(activeUnitInstance.damageDealt)}</b>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center border-b border-amber-900/40 pb-2">
+                            <span class="font-bold text-amber-400 text-sm flex items-center gap-2">
+                                <i class="fa-solid ${config.icon}"></i> ${config.name}
+                            </span>
+                            <span class="text-xs font-semibold text-amber-300"><i class="fa-solid fa-coins"></i> ${config.cost} Oro</span>
+                        </div>
+                        <p class="text-xs text-slate-400 italic">${config.description}</p>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-300 pt-1">
+                            <div>Salute: <b class="text-emerald-400">${config.hp}</b></div>
+                            <div>Attacco: <b class="text-amber-400">${config.damage}</b></div>
+                            <div>Gittata: <b>${config.range}px</b></div>
+                            <div>Velocità: <b>${config.speed}</b></div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function logMessage(msg, type = 'info') {
+            const log = document.getElementById('battleLog');
+            const entry = document.createElement('div');
+            entry.className = type === 'error' ? 'text-rose-400 font-semibold' : 'text-slate-300';
+            entry.innerText = `> ${msg}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        /* --- AVVIO --- */
+        window.onload = function() {
+            resizeCanvas();
+            initUI();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
